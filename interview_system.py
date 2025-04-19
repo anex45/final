@@ -15,6 +15,7 @@ import time
 from colorama import init, Fore, Style
 from prettytable import PrettyTable
 from feedback_generator import FeedbackGenerator
+from feedback_generator_seq2seq import FeedbackGeneratorSeq2Seq
 
 # Initialize colorama for colored terminal output
 init(autoreset=True)
@@ -22,13 +23,19 @@ init(autoreset=True)
 class InterviewSystem:
     """Terminal-based Python interview system."""
     
-    def __init__(self):
+    def __init__(self, use_seq2seq=False):
         # Load questions from training data
         self.questions = self.load_questions()
         self.categories = list(set([q['category'] for q in self.questions]))
         
         # Initialize feedback generator
-        self.feedback_gen = FeedbackGenerator()
+        if use_seq2seq and os.path.exists('models/bert_feedback_final.pt'):
+            print(f"{Fore.GREEN}Using BERT sequence-to-sequence model for feedback generation.")
+            self.feedback_gen = FeedbackGeneratorSeq2Seq()
+        else:
+            if use_seq2seq:
+                print(f"{Fore.YELLOW}Sequence-to-sequence model not found. Using standard feedback generator.")
+            self.feedback_gen = FeedbackGenerator()
         
         # Interview session state
         self.current_session = {
