@@ -140,7 +140,7 @@ def train_model(model, train_dataloader, val_dataloader, device, epochs=3):
         # Calculate training metrics
         train_loss = train_loss / len(train_dataloader)
         train_acc = accuracy_score(train_labels, train_preds)
-        train_f1 = f1_score(train_labels, train_preds)
+        train_f1 = f1_score(train_labels, train_preds, average='binary', pos_label=1)
         
         print(f"Train Loss: {train_loss:.4f}, Accuracy: {train_acc:.4f}, F1: {train_f1:.4f}")
         
@@ -170,9 +170,10 @@ def train_model(model, train_dataloader, val_dataloader, device, epochs=3):
         # Calculate validation metrics
         val_loss = val_loss / len(val_dataloader)
         val_acc = accuracy_score(val_labels, val_preds)
-        val_f1 = f1_score(val_labels, val_preds)
-        val_precision = precision_score(val_labels, val_preds)
-        val_recall = recall_score(val_labels, val_preds)
+        val_f1 = f1_score(val_labels, val_preds, average='binary', pos_label=1)
+        val_precision = precision_score(val_labels, val_preds, average='binary', pos_label=1)
+        val_recall = recall_score(val_labels, val_preds, average='binary', pos_label=1)
+
         
         print(f"Val Loss: {val_loss:.4f}, Accuracy: {val_acc:.4f}, F1: {val_f1:.4f}")
         print(f"Precision: {val_precision:.4f}, Recall: {val_recall:.4f}")

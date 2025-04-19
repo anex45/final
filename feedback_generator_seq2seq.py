@@ -28,6 +28,10 @@ class FeedbackGeneratorSeq2Seq:
         
         # Initialize and load the sequence-to-sequence model
         self.initialize_model(model_path)
+
+        # Load classification model
+        self.classification_model = load_model('models/bert_interview_best.pt', self.device)
+        self.classification_model.eval()
         
         # Load training data for reference answers
         self.training_data = self.load_training_data()
@@ -334,6 +338,21 @@ class FeedbackGeneratorSeq2Seq:
         
         if not reference_answers:
             return "I don't have reference answers for this question yet."
+
+        # Classify answer using classification model
+        input_text = f"{question} [SEP] {candidate_answer}"
+        inputs = self.tokenizer(input_text, padding=True, truncation=True, max_length=512, return_tensors="pt")
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        
+        with torch.no_grad():
+            outputs = self.classification_model(**inputs)
+            logits = outputs.logits
+            probs = torch.nn.functional.softmax(logits, dim=-1)
+            confidence = probs[0][1].item()
+            prediction = logits.argmax(-1).item()
+
+        # Add classification result to feedback
+        feedback_parts.append(f"\nClassification: {'Correct' if prediction == 1 else 'Incorrect'} (Confidence: {confidence:.2%})")
         
         # Calculate similarity scores
         similarities = [self.calculate_similarity(candidate_answer, ref) for ref in reference_answers]
