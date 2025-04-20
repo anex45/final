@@ -6,6 +6,8 @@ Terminal Python Interview System
 
 This module implements a terminal-based Python interview system that uses a
 fine-tuned BERT model to evaluate candidate responses and provide dynamic feedback.
+It supports multiple feedback generation models including BERT, Seq2Seq, T5, and
+a combined orchestrator that integrates all models for comprehensive feedback.
 """
 
 import os
@@ -16,6 +18,8 @@ from colorama import init, Fore, Style
 from prettytable import PrettyTable
 from feedback_generator import FeedbackGenerator
 from feedback_generator_seq2seq import FeedbackGeneratorSeq2Seq
+from feedback_generator_t5 import FeedbackGeneratorT5
+from feedback_orchestrator import FeedbackOrchestrator
 
 # Initialize colorama for colored terminal output
 init(autoreset=True)
@@ -23,19 +27,31 @@ init(autoreset=True)
 class InterviewSystem:
     """Terminal-based Python interview system."""
     
-    def __init__(self, use_seq2seq=False):
+    def __init__(self, use_seq2seq=False, use_t5=False, use_combined=False):
         # Load questions from training data
         self.questions = self.load_questions()
         self.categories = list(set([q['category'] for q in self.questions]))
         
-        # Initialize feedback generator
-        if use_seq2seq and os.path.exists('models/bert_feedback_final.pt'):
+        # Initialize feedback generator based on specified model type
+        if use_combined:
+            print(f"{Fore.GREEN}Using Combined Orchestrator for comprehensive feedback generation.")
+            self.feedback_gen = FeedbackOrchestrator(use_all_models=True)
+        elif use_t5 and os.path.exists('models/t5_feedback_final.pt'):
+            print(f"{Fore.GREEN}Using T5 model for advanced feedback generation.")
+            self.feedback_gen = FeedbackGeneratorT5()
+        elif use_seq2seq and os.path.exists('models/bert_feedback_final.pt'):
             print(f"{Fore.GREEN}Using BERT sequence-to-sequence model for feedback generation.")
             self.feedback_gen = FeedbackGeneratorSeq2Seq()
         else:
-            if use_seq2seq:
+            if use_combined:
+                print(f"{Fore.YELLOW}Some models not found. Using available models for feedback generation.")
+                self.feedback_gen = FeedbackOrchestrator(use_all_models=True)
+            elif use_t5:
+                print(f"{Fore.YELLOW}T5 model not found. Using standard feedback generator.")
+            elif use_seq2seq:
                 print(f"{Fore.YELLOW}Sequence-to-sequence model not found. Using standard feedback generator.")
-            self.feedback_gen = FeedbackGenerator()
+            else:
+                self.feedback_gen = FeedbackGenerator()
         
         # Interview session state
         self.current_session = {
@@ -78,7 +94,7 @@ class InterviewSystem:
         
         print(f"{Fore.WHITE}Welcome to the Python Interview System!")
         print("This system will ask you Python interview questions and provide")
-        print("dynamic feedback on your responses based on a fine-tuned BERT model.\n")
+        print("dynamic feedback on your responses using advanced AI models.\n")
         
         print(f"{Fore.YELLOW}Instructions:")
         print("1. You will be asked a series of Python interview questions.")

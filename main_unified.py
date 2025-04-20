@@ -9,16 +9,18 @@ This script serves as a single entry point for the entire Python interview syste
 2. Checks and generates feedback dataset if not present
 3. Trains the BERT classification model if not trained
 4. Trains the BERT sequence-to-sequence model for feedback if not trained
-5. Runs the terminal interview system with the appropriate settings
+5. Trains the T5 model for advanced feedback generation if requested
+6. Runs the terminal interview system with the appropriate settings
 
 Usage:
-    python main_unified.py [--use-seq2seq]
+    python main_unified.py [--use-seq2seq] [--use-t5] [--use-combined]
 """
 
 import os
 import sys
 import json
 import argparse
+import torch
 from colorama import init, Fore, Style
 
 # Import system components
@@ -28,6 +30,8 @@ import model_trainer_seq2seq
 import generate_feedback_data
 from interview_system import InterviewSystem
 from utils import ensure_directories_exist
+from feedback_generator_t5 import FeedbackGeneratorT5
+from feedback_orchestrator import FeedbackOrchestrator
 
 # Initialize colorama for colored terminal output
 init(autoreset=True)
@@ -47,6 +51,10 @@ def check_model_exists():
 def check_feedback_model_exists():
     """Check if trained feedback model exists."""
     return os.path.exists('models/bert_feedback_final.pt')
+
+def check_t5_model_exists():
+    """Check if trained T5 model exists."""
+    return os.path.exists('models/t5_feedback_final.pt')
 
 def generate_data():
     """Generate training data if it doesn't exist."""
@@ -160,23 +168,83 @@ def train_feedback_model():
         print(f"{Fore.YELLOW}The system will use rule-based feedback generation instead.")
         return False
 
-def run_interview_system(use_seq2seq=False):
+def train_t5_model():
+    """Train the T5 model for advanced feedback generation."""
+    print(f"{Fore.YELLOW}Checking for trained T5 model...")
+    
+    if check_t5_model_exists():
+        print(f"{Fore.GREEN}Trained T5 model already exists.")
+        return True
+    
+    print(f"{Fore.YELLOW}Starting T5 model training...")
+    print(f"{Fore.YELLOW}This may take some time depending on your hardware.")
+    
+    try:
+        # Check if feedback dataset exists for training
+        if not check_feedback_data_exists():
+            print(f"{Fore.RED}Error: Feedback dataset not found. Cannot train T5 model.")
+            print(f"{Fore.YELLOW}The system will use alternative feedback generation instead.")
+            return False
+            
+        # Initialize T5 model which will train if model doesn't exist
+        t5_model = FeedbackGeneratorT5(model_type='t5')
+        
+        # Verify the model was loaded or initialized properly
+        if t5_model.model is None:
+            print(f"{Fore.RED}Error: Failed to initialize T5 model.")
+            print(f"{Fore.YELLOW}The system will use alternative feedback generation instead.")
+            return False
+        
+        if check_t5_model_exists():
+            print(f"{Fore.GREEN}T5 model trained successfully.")
+            return True
+        else:
+            print(f"{Fore.RED}Error: Failed to train T5 model.")
+            print(f"{Fore.YELLOW}The system will use alternative feedback generation instead.")
+            return False
+    except Exception as e:
+        print(f"{Fore.RED}Error training T5 model: {str(e)}")
+        print(f"{Fore.YELLOW}The system will use alternative feedback generation instead.")
+        return False
+
+def run_interview_system(use_seq2seq=False, use_t5=False, use_combined=False):
     """Run the terminal interview system."""
     print(f"{Fore.GREEN}Starting the Python Interview System...")
     
     try:
+        # Verify that required data and models exist before starting
+        if not check_data_exists():
+            print(f"{Fore.RED}Error: Training data not found. Cannot run interview system.")
+            return False
+            
+        if use_seq2seq and not check_feedback_model_exists():
+            print(f"{Fore.YELLOW}Warning: Seq2Seq model not found but was requested.")
+            print(f"{Fore.YELLOW}The system will fall back to rule-based feedback generation.")
+            
+        if use_t5 and not check_t5_model_exists():
+            print(f"{Fore.YELLOW}Warning: T5 model not found but was requested.")
+            print(f"{Fore.YELLOW}The system will fall back to alternative feedback generation.")
+        
         # Initialize and run the interview system
-        interview = InterviewSystem(use_seq2seq=use_seq2seq)
+        interview = InterviewSystem(use_seq2seq=use_seq2seq, use_t5=use_t5, use_combined=use_combined)
         interview.run()
+        print(f"{Fore.GREEN}Interview system completed successfully.")
+        return True
+    except KeyboardInterrupt:
+        print(f"{Fore.YELLOW}\nInterview system interrupted by user.")
         return True
     except Exception as e:
         print(f"{Fore.RED}Error running interview system: {str(e)}")
+        import traceback
+        print(f"{Fore.RED}Traceback: {traceback.format_exc()}")
         return False
 
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Python Interview System with BERT-based Feedback')
     parser.add_argument('--use-seq2seq', action='store_true', help='Use the sequence-to-sequence model for feedback')
+    parser.add_argument('--use-t5', action='store_true', help='Use the T5 model for advanced feedback generation')
+    parser.add_argument('--use-combined', action='store_true', help='Use the combined orchestrator for comprehensive feedback')
     return parser.parse_args()
 
 def main():
@@ -185,36 +253,65 @@ def main():
     print(f"{Fore.CYAN}{Style.BRIGHT}" + " " * 15 + "PYTHON INTERVIEW SYSTEM INITIALIZATION" + " " * 15)
     print(f"{Fore.CYAN}{Style.BRIGHT}" + "=" * 80 + "\n")
     
-    # Parse command line arguments
-    args = parse_arguments()
-    
-    # Ensure all required directories exist
-    ensure_directories_exist()
-    
-    # Step 1: Generate training data if needed
-    if not generate_data():
-        print(f"{Fore.RED}Failed to prepare training data. Exiting.")
+    try:
+        # Parse command line arguments
+        args = parse_arguments()
+        
+        # Ensure all required directories exist
+        ensure_directories_exist()
+        
+        # Display system configuration
+        print(f"{Fore.CYAN}System Configuration:")
+        print(f"  - Using Seq2Seq model: {args.use_seq2seq}")
+        print(f"  - Using T5 model: {args.use_t5}")
+        print(f"  - Using Combined Orchestrator: {args.use_combined}")
+        print(f"  - Device: {torch.device('cuda' if torch.cuda.is_available() else 'cpu')}\n")
+        
+        # Step 1: Generate training data if needed
+        if not generate_data():
+            print(f"{Fore.RED}Failed to prepare training data. Exiting.")
+            return False
+        
+        # Step 2: Generate or expand feedback dataset
+        if not generate_feedback_dataset():
+            print(f"{Fore.YELLOW}Failed to generate feedback dataset. Will use rule-based feedback generation.")
+            if args.use_seq2seq or args.use_t5 or args.use_combined:
+                print(f"{Fore.YELLOW}Warning: Advanced feedback models were requested but may not work properly without feedback dataset.")
+        
+        # Step 3: Train the classification model if needed
+        if not train_model():
+            print(f"{Fore.RED}Failed to train the model. Exiting.")
+            return False
+        
+        # Step 4: Train the feedback model if needed and seq2seq is requested
+        if args.use_seq2seq and not train_feedback_model():
+            print(f"{Fore.YELLOW}Failed to train the feedback model. Will use rule-based feedback generation.")
+        
+        # Step 5: Train the T5 model if needed and T5 is requested
+        if args.use_t5 and not train_t5_model():
+            print(f"{Fore.YELLOW}Failed to train the T5 model. Will use alternative feedback generation.")
+        
+        # Verify all models are available as expected
+        print(f"\n{Fore.CYAN}Model Status:")
+        print(f"  - BERT Classification Model: {'Available' if check_model_exists() else 'Not Available'}")
+        print(f"  - Seq2Seq Feedback Model: {'Available' if check_feedback_model_exists() else 'Not Available'}")
+        print(f"  - T5 Feedback Model: {'Available' if check_t5_model_exists() else 'Not Available'}\n")
+        
+        # Step 6: Run the interview system
+        if not run_interview_system(use_seq2seq=args.use_seq2seq, use_t5=args.use_t5, use_combined=args.use_combined):
+            print(f"{Fore.RED}Failed to run the interview system. Exiting.")
+            return False
+        
+        print(f"\n{Fore.GREEN}{Style.BRIGHT}Python Interview System completed successfully.")
+        return True
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}System interrupted by user.")
+        return True
+    except Exception as e:
+        print(f"\n{Fore.RED}Unexpected error in main function: {str(e)}")
+        import traceback
+        print(f"{Fore.RED}Traceback: {traceback.format_exc()}")
         return False
-    
-    # Step 2: Generate or expand feedback dataset
-    if not generate_feedback_dataset():
-        print(f"{Fore.YELLOW}Failed to generate feedback dataset. Will use rule-based feedback generation.")
-    
-    # Step 3: Train the classification model if needed
-    if not train_model():
-        print(f"{Fore.RED}Failed to train the model. Exiting.")
-        return False
-    
-    # Step 4: Train the feedback model if needed and seq2seq is requested
-    if args.use_seq2seq and not train_feedback_model():
-        print(f"{Fore.YELLOW}Failed to train the feedback model. Will use rule-based feedback generation.")
-    
-    # Step 5: Run the interview system
-    if not run_interview_system(use_seq2seq=args.use_seq2seq):
-        print(f"{Fore.RED}Failed to run the interview system. Exiting.")
-        return False
-    
-    return True
 
 if __name__ == "__main__":
     main()
