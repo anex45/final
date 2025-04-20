@@ -153,9 +153,11 @@ def train_feedback_model():
             return True
         else:
             print(f"{Fore.RED}Error: Failed to train feedback model.")
+            print(f"{Fore.YELLOW}The system will use rule-based feedback generation instead.")
             return False
     except Exception as e:
         print(f"{Fore.RED}Error training feedback model: {str(e)}")
+        print(f"{Fore.YELLOW}The system will use rule-based feedback generation instead.")
         return False
 
 def run_interview_system(use_seq2seq=False):

@@ -12,11 +12,6 @@ egss/
 lib/
 lib64
 
-# Data files
-# Exclude large data files but keep essential datasets
-*.pickle
-
-# Models
 # Exclude large model binaries but keep configs
 *.pt
 *.bin

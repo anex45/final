@@ -138,18 +138,31 @@ class InterviewSystem:
     def ask_question(self, question):
         """Ask a question and get the candidate's response."""
         print(f"\n{Fore.CYAN}{Style.BRIGHT}Question:{Style.RESET_ALL} {question}")
-        print(f"{Fore.GREEN}Your answer (type 'exit' to end the interview):")
+        print(f"{Fore.GREEN}Your answer (type 'exit' to end the interview, or press Enter twice to finish your answer):")
         
         # Get multiline input
         print("> ", end="")
         lines = []
-        while True:
-            line = input()
-            if line.lower() == 'exit':
-                return 'exit'
-            if line.strip() == '' and lines and lines[-1].strip() == '':
-                break
-            lines.append(line)
+        line = input()
+        
+        # Handle single-line answers
+        if line.lower() == 'exit':
+            return 'exit'
+        
+        lines.append(line)
+        
+        # Check if user wants to provide more input
+        if line.strip() != '':
+            print("(Press Enter twice to finish your answer)")
+            
+            # Continue getting input for multiline answers
+            while True:
+                line = input()
+                if line.lower() == 'exit':
+                    return 'exit'
+                if line.strip() == '' and lines and lines[-1].strip() == '':
+                    break
+                lines.append(line)
         
         response = '\n'.join(lines)
         self.current_session['responses'].append(response)
@@ -163,17 +176,28 @@ class InterviewSystem:
         # Simulate processing time for a more realistic experience
         time.sleep(1.5)
         
-        # Get score and feedback
-        score = self.feedback_gen.get_score(question, response)
-        feedback = self.feedback_gen.generate_feedback(question, response)
-        
-        self.current_session['scores'].append(score)
-        self.current_session['feedback'].append(feedback)
-        
-        # Display results
-        print(f"\n{Fore.CYAN}{Style.BRIGHT}Evaluation Results:{Style.RESET_ALL}")
-        print(f"{Fore.GREEN}Score: {score}/100")
-        print(f"\n{Fore.MAGENTA}Feedback:{Style.RESET_ALL} {feedback}\n")
+        try:
+            # Get score and feedback
+            score = self.feedback_gen.get_score(question, response)
+            feedback = self.feedback_gen.generate_feedback(question, response)
+            
+            self.current_session['scores'].append(score)
+            self.current_session['feedback'].append(feedback)
+            
+            # Display results
+            print(f"\n{Fore.CYAN}{Style.BRIGHT}Evaluation Results:{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}Score: {score}/100")
+            print(f"\n{Fore.MAGENTA}Feedback:{Style.RESET_ALL} {feedback}\n")
+        except Exception as e:
+            print(f"\n{Fore.RED}Error generating feedback: {str(e)}")
+            # Provide a default score and feedback
+            score = 50
+            feedback = "Sorry, I couldn't generate detailed feedback for this response. Please try again."
+            self.current_session['scores'].append(score)
+            self.current_session['feedback'].append(feedback)
+            print(f"\n{Fore.CYAN}{Style.BRIGHT}Evaluation Results:{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}Score: {score}/100")
+            print(f"\n{Fore.MAGENTA}Feedback:{Style.RESET_ALL} {feedback}\n")
         
         return score, feedback
     

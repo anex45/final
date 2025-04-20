@@ -16,6 +16,7 @@ import random
 import numpy as np
 from transformers import BertTokenizer, EncoderDecoderModel
 from sklearn.metrics.pairwise import cosine_similarity
+from model_trainer import load_model
 
 class FeedbackGeneratorSeq2Seq:
     """Generates dynamic feedback for candidate responses using a seq2seq model."""
@@ -339,6 +340,9 @@ class FeedbackGeneratorSeq2Seq:
         if not reference_answers:
             return "I don't have reference answers for this question yet."
 
+        # Initialize feedback parts list
+        feedback_parts = []
+        
         # Classify answer using classification model
         input_text = f"{question} [SEP] {candidate_answer}"
         inputs = self.tokenizer(input_text, padding=True, truncation=True, max_length=512, return_tensors="pt")
@@ -352,7 +356,7 @@ class FeedbackGeneratorSeq2Seq:
             prediction = logits.argmax(-1).item()
 
         # Add classification result to feedback
-        feedback_parts.append(f"\nClassification: {'Correct' if prediction == 1 else 'Incorrect'} (Confidence: {confidence:.2%})")
+        feedback_parts.append(f"Classification: {'Correct' if prediction == 1 else 'Incorrect'} (Confidence: {confidence:.2%})")
         
         # Calculate similarity scores
         similarities = [self.calculate_similarity(candidate_answer, ref) for ref in reference_answers]
